@@ -18,22 +18,26 @@ jobs:
       - name: 저장소 코드 체크아웃
         uses: actions/checkout@v4
 
-      - name: 한글 폰트 설치 (PNG 이미지 한글 깨짐 방지)
+      - name: 한글 폰트 및 Chrome 래퍼 설정 (PNG 이미지 생성용)
         run: |
           sudo apt-get update
           sudo apt-get install -y fonts-nanum fonts-noto-cjk fontconfig
           fc-cache -fv
+          cat << 'EOF' | sudo tee /usr/local/bin/chrome > /dev/null
+          #!/bin/bash
+          exec google-chrome --no-sandbox --disable-dev-shm-usage "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/chrome
 
       - name: Python 3.11 설정
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          cache: 'pip'
 
       - name: 필수 패키지 설치
         run: |
           pip install --upgrade pip
-          pip install finance-datareader pandas requests google-api-python-client google-auth-httplib2 google-auth-oauthlib pillow
+          pip install finance-datareader pandas requests google-api-python-client google-auth-httplib2 google-auth-oauthlib pillow beautifulsoup4 lxml
 
       - name: ETF 대시보드 생성 및 Google Drive 업로드 (HTML + PNG)
         env:
@@ -41,4 +45,10 @@ jobs:
           GDRIVE_TOKEN_JSON: ${{ secrets.GDRIVE_TOKEN_JSON }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
+          if [ -n "$GDRIVE_CREDENTIALS_JSON" ]; then
+            printf '%s' "$GDRIVE_CREDENTIALS_JSON" > credentials.json
+          fi
+          if [ -n "$GDRIVE_TOKEN_JSON" ]; then
+            printf '%s' "$GDRIVE_TOKEN_JSON" > token.json
+          fi
           python etf_dashboard.py --once --no-open
