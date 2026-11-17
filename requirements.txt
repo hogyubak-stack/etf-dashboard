@@ -1,0 +1,9 @@
+finance-datareader
+pandas
+requests
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
+pillow
+beautifulsoup4
+lxml
