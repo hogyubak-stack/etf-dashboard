@@ -2,14 +2,16 @@ name: Update ETF Dashboard
 
 on:
   schedule:
-    # 한국 시간(KST = UTC+9) 기준 평일(월~금) 자동 실행 (주말 제외)
-    - cron: '4 23 * * 0-4'   # 평일 아침 08:04 KST (UTC 일~목 23:04) -> ETF 대시보드
-    - cron: '4 4 * * 1-5'    # 평일 오후 13:04 KST (UTC 월~금 04:04) -> ETF 대시보드
-    - cron: '10 5 * * 1-5'    # 평일 오후 14:10 KST (UTC 월~금 04:04) -> ETF 대시보드
-    - cron: '4 6 * * 1-5'    # 평일 오후 15:04 KST (UTC 월~금 04:04) -> ETF 대시보드
-    - cron: '4 7 * * 1-5'    # 평일 오후 16:04 KST (UTC 월~금 04:04) -> ETF 대시보드
-    - cron: '34 11 * * 1-5'  # 평일 저녁 20:34 KST (UTC 월~금 11:34) -> ETF + MDD 대시보드
-  workflow_dispatch:         # GitHub 웹페이지에서 수동 즉시 실행 시 둘 다 실행
+    # 한국 시간(KST = UTC+9) 기준 평일 자동 실행
+    - cron: '2 23 * * 0-4'   # 한국 평일 08:02 KST
+    - cron: '30 0 * * 1-5'   # 한국 평일 09:30 KST
+    - cron: '0 4 * * 1-5'    # 한국 평일 13:00 KST
+    - cron: '30 11 * * 1-5'  # 한국 평일 20:30 KST
+    # 미국 동부시간(ET) 기준 평일 10:00, 14:00, 18:00 (EST 기준 UTC 15:00, 19:00, 23:00)
+    - cron: '0 15 * * 1-5'   # 미국 평일 10:00 ET
+    - cron: '0 19 * * 1-5'   # 미국 평일 14:00 ET
+    - cron: '0 23 * * 1-5'   # 미국 평일 18:00 ET
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -58,22 +60,32 @@ jobs:
             printf '%s' "$GDRIVE_TOKEN_JSON" > token.json
           fi
 
-      - name: ETF 대시보드 생성 및 Google Drive 업로드 (08:04 / 13:04 / 20:34)
+      - name: 한국 ETF 대시보드 생성 및 Google Drive 업로드
         env:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
           python etf_dashboard.py --once --no-open
 
-      - name: MDD 대시보드 생성 및 Google Drive 업로드 (평일 20:34 또는 수동 실행 시)
-        if: github.event.schedule == '34 11 * * 1-5' || github.event_name == 'workflow_dispatch' || !hashFiles('mdd_dashboard.html')
+      - name: 미국 ETF 대시보드 생성 및 Google Drive 업로드
         env:
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
         run: |
-          if [ -f "mdd_dashboard.py" ]; then
-            python mdd_dashboard.py
+          if [ -f "us_etf_dashboard.py" ]; then
+            python us_etf_dashboard.py --once --no-open
           fi
 
-      - name: GitHub Pages용 웹페이지(index.html) 생성 및 반영
+      - name: MDD 대시보드 생성 및 Google Drive 업로드 (평일 20:30 KST 또는 최초 생성 시)
+        env:
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+        run: |
+          HOUR_KST=$(TZ=Asia/Seoul date +%H)
+          if [ -f "mdd_dashboard.py" ]; then
+            if [ "$HOUR_KST" = "20" ] || [ "$HOUR_KST" = "21" ] || [ ! -f "mdd_dashboard.html" ]; then
+              python mdd_dashboard.py
+            fi
+          fi
+
+      - name: GitHub Pages용 통합 웹페이지(index.html) 생성 및 반영
         run: |
           rm -f credentials.json token.json
           cat << 'EOF' > index.html
@@ -82,11 +94,11 @@ jobs:
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width,initial-scale=1">
-            <title>ETF & MDD 통합 대시보드</title>
+            <title>한국·미국 ETF & MDD 통합 대시보드</title>
             <style>
               * { box-sizing: border-box; margin: 0; padding: 0; }
               body, html { height: 100%; font-family: -apple-system, "Malgun Gothic", sans-serif; background: #f5f6f8; }
-              .nav { display: flex; gap: 8px; padding: 8px 12px; background: #1a1d27; align-items: center; }
+              .nav { display: flex; gap: 8px; padding: 8px 12px; background: #1a1d27; align-items: center; flex-wrap: wrap; }
               .nav button { padding: 6px 14px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: transparent; color: #aaa; font-size: 13px; font-weight: 600; cursor: pointer; }
               .nav button.active { background: #378add; color: #fff; border-color: #378add; }
               iframe { width: 100%; height: calc(100% - 46px); border: none; display: block; background: #fff; }
@@ -94,11 +106,13 @@ jobs:
           </head>
           <body>
             <div class="nav">
-              <button id="btn-etf" class="active" onclick="show('etf_dashboard.html', this)">📊 섹터별 대표 ETF</button>
+              <button id="btn-kr" class="active" onclick="show('etf_dashboard.html', this)">🇰🇷 한국 섹터별 ETF</button>
+              <button id="btn-us" onclick="show('us_etf_dashboard.html', this)">🇺🇸 미국 대표 ETF</button>
               <button id="btn-mdd" onclick="show('mdd_dashboard.html', this)">📉 KOSPI · KOSDAQ MDD</button>
             </div>
             <iframe id="viewer" src="etf_dashboard.html"></iframe>
             <script>
+              document.getElementById('viewer').src = 'etf_dashboard.html?t=' + Date.now();
               function show(url, btn) {
                 document.getElementById('viewer').src = url + '?t=' + Date.now();
                 document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
@@ -111,7 +125,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html etf_dashboard.html
-          if [ -f "mdd_dashboard.py" ] && [ -f "mdd_dashboard.html" ]; then
+          if [ -f "us_etf_dashboard.html" ]; then
+            git add us_etf_dashboard.html
+          fi
+          if [ -f "mdd_dashboard.html" ]; then
             git add mdd_dashboard.html
           fi
           git diff --staged --quiet || (git commit -m "Auto-update dashboards" && git push)
