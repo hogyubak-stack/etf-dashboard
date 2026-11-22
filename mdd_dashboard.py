@@ -148,53 +148,54 @@ html = f"""<!DOCTYPE html>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 :root {{
-  --bg:#0f1117; --bg2:#1a1d27; --bg3:#22263a;
-  --border:rgba(255,255,255,.07); --text:#e8eaf0; --muted:#8890a4;
-  --red:#e24b4a; --green:#1d9e75; --blue:#378add; --amber:#ef9f27;
+  --bg:#ffffff; --bg2:#f8fafc; --bg3:#eef1f6;
+  --border:#cfd5df; --text:#222222; --muted:#64748b;
+  --red:#e0262b; --green:#0f9d58; --blue:#1f5fd6; --amber:#d97706;
   --radius:10px;
 }}
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{background:var(--bg);color:var(--text);font-family:'Pretendard','Malgun Gothic','Apple SD Gothic Neo','Noto Sans CJK KR','NanumGothic',sans-serif;font-size:14px;line-height:1.6}}
 .page{{max-width:1100px;margin:0 auto;padding:28px 20px 60px}}
-h1{{font-size:18px;font-weight:500;margin-bottom:4px}}
+h1{{font-size:18px;font-weight:600;margin-bottom:4px}}
 .subtitle{{font-size:13px;color:var(--muted);margin-bottom:20px}}
 .section{{margin-bottom:52px}}
 .section-header{{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}}
-.section-title{{font-size:15px;font-weight:500}}
+.section-title{{font-size:15px;font-weight:600}}
 
 /* 기간 필터 */
 .period-btns{{display:flex;gap:6px;margin-left:auto}}
-.pb{{font-size:12px;padding:4px 12px;border:0.5px solid var(--border);border-radius:20px;
-     background:transparent;color:var(--muted);cursor:pointer;transition:all .15s}}
+.pb{{font-size:12px;padding:4px 12px;border:1px solid var(--border);border-radius:20px;
+     background:#fff;color:var(--muted);cursor:pointer;transition:all .15s}}
 .pb:hover{{background:var(--bg3);color:var(--text)}}
-.pb.active{{background:var(--bg3);color:var(--text);border-color:rgba(255,255,255,.2)}}
+.pb.active{{background:var(--bg3);color:var(--text);border-color:#94a3b8;font-weight:600}}
 
 /* 메트릭 */
 .metrics{{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}}
-.mc{{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:14px 16px}}
+.mc{{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}}
 .mc-label{{font-size:11px;color:var(--muted);margin-bottom:5px}}
-.mc-val{{font-size:21px;font-weight:500}}
+.mc-val{{font-size:21px;font-weight:600}}
 .mc-sub{{font-size:11px;color:var(--muted);margin-top:3px}}
 .red{{color:var(--red)}}.green{{color:var(--green)}}.amber{{color:var(--amber)}}
 
 /* 차트 */
-.chart-box{{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px}}
+.chart-box{{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:14px}}
 .chart-legend{{font-size:12px;color:var(--muted);margin-bottom:10px;display:flex;gap:16px;flex-wrap:wrap}}
 .leg{{display:flex;align-items:center;gap:5px}}
 .leg-dot{{width:10px;height:10px;border-radius:2px}}
 .chart-wrap{{position:relative;width:100%}}
 
 /* 테이블 */
-.yr-table-box{{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}}
-.yr-table-header{{font-size:12px;color:var(--muted);padding:12px 16px 8px;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}}
+.yr-table-box{{background:#fff;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}}
+.yr-table-header{{font-size:12px;color:var(--muted);background:var(--bg2);padding:12px 16px 8px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}}
 .stat-pills{{display:flex;gap:8px;flex-wrap:wrap}}
 .pill{{font-size:11px;padding:3px 10px;border-radius:20px;background:var(--bg3);color:var(--muted)}}
-.pill span{{color:var(--text);font-weight:500}}
+.pill span{{color:var(--text);font-weight:600}}
 table{{width:100%;border-collapse:collapse;font-size:13px}}
-th{{font-size:11px;color:var(--muted);font-weight:400;text-align:left;padding:8px 14px;border-bottom:0.5px solid var(--border);white-space:nowrap}}
-td{{padding:8px 14px;border-bottom:0.5px solid var(--border);white-space:nowrap}}
+th{{font-size:11px;color:#334155;background:var(--bg3);font-weight:600;text-align:left;padding:8px 14px;border-bottom:1px solid var(--border);white-space:nowrap}}
+td{{padding:8px 14px;border-bottom:1px solid #e1e4ea;white-space:nowrap}}
+tr:nth-child(even) td{{background:#fafbfc}}
 tr:last-child td{{border-bottom:none}}
-tr.worst-row td{{background:rgba(226,75,74,.07)}}
+tr.worst-row td{{background:#fbe3ee}}
 .dd-bar-wrap{{width:80px}}
 .dd-bar{{height:4px;border-radius:2px;background:var(--red);opacity:.75}}
 .ret-pos{{color:var(--green)}}.ret-neg{{color:var(--red)}}
@@ -365,20 +366,20 @@ function makeLineChart(id, d, idxColor) {{
       plugins:{{
         legend:{{display:false}},
         tooltip:{{
-          backgroundColor:'#1a1d27',borderColor:'rgba(255,255,255,.1)',borderWidth:1,
-          titleColor:'#8890a4',bodyColor:'#e8eaf0',
+          backgroundColor:'#ffffff',borderColor:'#cfd5df',borderWidth:1,
+          titleColor:'#64748b',bodyColor:'#222222',
           callbacks:{{label:ctx=>ctx.datasetIndex===0
             ?` 지수: ${{ctx.parsed.y.toFixed(1)}}`
             :` 낙폭: ${{ctx.parsed.y.toFixed(2)}}%`}}
         }}
       }},
       scales:{{
-        x:{{ticks:{{maxTicksLimit:8,maxRotation:0,font:{{size:11}},color:'#8890a4'}},
-            grid:{{color:'rgba(255,255,255,.04)'}},border:{{color:'rgba(255,255,255,.08)'}}}},
-        y:{{position:'left',ticks:{{font:{{size:11}},color:'#8890a4',maxTicksLimit:6}},
-            grid:{{color:'rgba(255,255,255,.06)'}},border:{{color:'rgba(255,255,255,.08)'}}}},
+        x:{{ticks:{{maxTicksLimit:8,maxRotation:0,font:{{size:11}},color:'#64748b'}},
+            grid:{{color:'rgba(15,23,42,.06)'}},border:{{color:'#cfd5df'}}}},
+        y:{{position:'left',ticks:{{font:{{size:11}},color:'#64748b',maxTicksLimit:6}},
+            grid:{{color:'rgba(15,23,42,.06)'}},border:{{color:'#cfd5df'}}}},
         y2:{{position:'right',max:5,
-             ticks:{{font:{{size:11}},color:'#e24b4a',maxTicksLimit:5,callback:v=>v.toFixed(0)+'%'}},
+             ticks:{{font:{{size:11}},color:'#e0262b',maxTicksLimit:5,callback:v=>v.toFixed(0)+'%'}},
              grid:{{display:false}},border:{{display:false}}}}
       }}
     }}
@@ -403,7 +404,7 @@ function makeBarChart(id, d) {{
       c.save();
       c.font = '10px sans-serif';
       c.textAlign = 'center';
-      c.fillStyle = 'rgba(255,255,255,0.9)';
+      c.fillStyle = '#334155';
       meta.data.forEach((bar,i) => {{
         const barH = bar.base - bar.y;
         if (barH < 16) return;
@@ -433,8 +434,8 @@ function makeBarChart(id, d) {{
       plugins:{{
         legend:{{display:false}},
         tooltip:{{
-          backgroundColor:'#1a1d27',borderColor:'rgba(255,255,255,.1)',borderWidth:1,
-          titleColor:'#8890a4',bodyColor:'#e8eaf0',
+          backgroundColor:'#ffffff',borderColor:'#cfd5df',borderWidth:1,
+          titleColor:'#64748b',bodyColor:'#222222',
           callbacks:{{label:ctx=>{{
             const i=ctx.dataIndex;
             return [` MDD: ${{mdds[i].toFixed(2)}}%`,` 연수익: ${{rets[i]>=0?'+':''}}${{rets[i].toFixed(2)}}%`];
@@ -442,11 +443,11 @@ function makeBarChart(id, d) {{
         }}
       }},
       scales:{{
-        x:{{ticks:{{font:{{size:11}},color:'#8890a4',maxRotation:0}},
-            grid:{{display:false}},border:{{color:'rgba(255,255,255,.08)'}}}},
+        x:{{ticks:{{font:{{size:11}},color:'#64748b',maxRotation:0}},
+            grid:{{display:false}},border:{{color:'#cfd5df'}}}},
         y:{{max:0,
-            ticks:{{font:{{size:11}},color:'#8890a4',callback:v=>v+'%',maxTicksLimit:6}},
-            grid:{{color:'rgba(255,255,255,.04)'}},border:{{color:'rgba(255,255,255,.08)'}}}}
+            ticks:{{font:{{size:11}},color:'#64748b',callback:v=>v+'%',maxTicksLimit:6}},
+            grid:{{color:'rgba(15,23,42,.06)'}},border:{{color:'#cfd5df'}}}}
       }}
     }}
   }});

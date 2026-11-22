@@ -28,6 +28,13 @@ ETF_NAMES = [
     "KODEX 건설", "TIGER 은행고배당플러스TOP10", "KODEX 증권",
 ]
 
+# (표시명, FinanceDataReader 심볼, yfinance 폴백 심볼)
+FX_ITEMS = [
+    ("원/달러", "USD/KRW", "KRW=X"),
+    ("원/100엔", "JPY/KRW", "JPYKRW=X"),
+    ("원/스위스프랑", "CHF/KRW", "CHFKRW=X"),
+]
+
 PERIODS = [("D", "L일봉H"), ("W", "L주봉H"), ("M", "L월봉H"), ("Y", "L연봉H")]
 UP, DOWN, FLAT = "#e0262b", "#1f5fd6", "#333"
 
@@ -76,6 +83,37 @@ def period_candles(daily: pd.DataFrame) -> dict:
     return out
 
 
+def fetch_fx_daily(fdr_sym: str, yf_sym: str, start: str) -> pd.DataFrame:
+    """FinanceDataReader로 환율 일봉을 조회하고, 실패 시 yfinance로 폴백."""
+    import FinanceDataReader as fdr
+    daily = pd.DataFrame()
+    try:
+        daily = fdr.DataReader(fdr_sym, start)
+    except Exception:
+        daily = pd.DataFrame()
+
+    if daily is None or daily.empty or "Close" not in daily.columns:
+        try:
+            import yfinance as yf
+            df = yf.download(yf_sym, start=start, progress=False, auto_adjust=False)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            daily = df[["Open", "High", "Low", "Close"]].dropna(subset=["Close"])
+        except Exception as e:
+            print(f"[경고] 환율 {fdr_sym} 수집 실패: {e}", file=sys.stderr)
+            return pd.DataFrame()
+
+    daily = daily[["Open", "High", "Low", "Close"]].dropna(subset=["Close"]).copy()
+    for col in ("Open", "High", "Low", "Close"):
+        daily[col] = pd.to_numeric(daily[col], errors="coerce")
+    daily = daily.dropna(subset=["Close"])
+    # 엔화가 1엔 기준(예: 9.12원)으로 들어오면 100엔 기준(912.00원)으로 환산
+    if fdr_sym == "JPY/KRW" and not daily.empty and float(daily["Close"].iloc[-1]) < 50:
+        for col in ("Open", "High", "Low", "Close"):
+            daily[col] = daily[col] * 100.0
+    return daily
+
+
 def fetch_live():
     import FinanceDataReader as fdr
     listing = load_listing()
@@ -92,7 +130,19 @@ def fetch_live():
             daily = pd.DataFrame()
         rows.append(dict(name=r["Name"], code=r["Symbol"], price=float(r["Price"]),
                          chg=float(r["ChangeRate"]), mcap=float(r["MarCap"]),
-                         candles=period_candles(daily) if len(daily) else {}))
+                         candles=period_candles(daily) if len(daily) else {}, is_fx=False))
+
+    for fx_name, fdr_sym, yf_sym in FX_ITEMS:
+        daily = fetch_fx_daily(fdr_sym, yf_sym, start)
+        if daily.empty:
+            missing.append(fx_name); continue
+        c = period_candles(daily)
+        d = c.get("D", {})
+        price = d.get("C", float(daily["Close"].iloc[-1]))
+        base = d.get("base", price)
+        chg = ((price / base) - 1) * 100 if base else 0.0
+        rows.append(dict(name=fx_name, code=fdr_sym, price=price,
+                         chg=chg, mcap=None, candles=c, is_fx=True))
     return rows, missing
 
 
@@ -111,12 +161,24 @@ def fetch_demo():
         c = period_candles(daily)
         rows.append(dict(name=name, code=f"DEMO{i:02d}", price=c["D"]["C"],
                          chg=(c["D"]["C"] / c["D"]["base"] - 1) * 100,
-                         mcap=float(rng.integers(80, 220000)), candles=c))
+                         mcap=float(rng.integers(80, 220000)), candles=c, is_fx=False))
+
+    demo_bases = {"USD/KRW": 1390.0, "JPY/KRW": 910.0, "CHF/KRW": 1580.0}
+    for fx_name, fdr_sym, _ in FX_ITEMS:
+        p = demo_bases[fdr_sym] * np.exp(np.cumsum(rng.normal(0.0001, 0.004, len(idx))))
+        o = p * (1 + rng.normal(0, .0015, len(idx)))
+        daily = pd.DataFrame({"Open": o, "Close": p,
+                              "High": np.maximum(o, p) * (1 + abs(rng.normal(0, .002, len(idx)))),
+                              "Low": np.minimum(o, p) * (1 - abs(rng.normal(0, .002, len(idx))))}, index=idx)
+        c = period_candles(daily)
+        rows.append(dict(name=fx_name, code=fdr_sym, price=c["D"]["C"],
+                         chg=(c["D"]["C"] / c["D"]["base"] - 1) * 100,
+                         mcap=None, candles=c, is_fx=True))
     return rows, []
 
 
 # ───────────────────────── 렌더링 ─────────────────────────
-def candle_svg(c: dict, span: float, w=96, h=16) -> str:
+def candle_svg(c: dict, span: float, w=96, h=16, fmt=",.0f") -> str:
     """
     가로형 미니 캔들 (키움 'L일봉H' 스타일).
     가로축 = 직전 기간 종가 대비 % (컬럼 전체 공통 스케일 ±span%), 중앙 세로선 = 기준가.
@@ -129,9 +191,9 @@ def candle_svg(c: dict, span: float, w=96, h=16) -> str:
     col = UP if c["C"] > c["O"] else DOWN if c["C"] < c["O"] else FLAT
     xl, xh, xo, xc = x(c["L"]), x(c["H"]), x(c["O"]), x(c["C"])
     bx, bw = min(xo, xc), max(abs(xc - xo), 1.5)
-    tip = (f"시 {c['O']:,.0f} / 고 {c['H']:,.0f} / 저 {c['L']:,.0f} / 종 {c['C']:,.0f}\n"
+    tip = (f"시 {c['O']:{fmt}} / 고 {c['H']:{fmt}} / 저 {c['L']:{fmt}} / 종 {c['C']:{fmt}}\n"
            + (f"⚠ 데이터 {c['days']}거래일뿐 (기준가=첫날 시가)\n" if c.get("short") else "")
-           + f"기준가 {c['base']:,.0f}  ({pct(c['C']):+.2f}%)  고 {pct(c['H']):+.2f}% 저 {pct(c['L']):+.2f}%")
+           + f"기준가 {c['base']:{fmt}}  ({pct(c['C']):+.2f}%)  고 {pct(c['H']):+.2f}% 저 {pct(c['L']):+.2f}%")
     return (f'<svg width="{w}" height="{h}"><title>{html.escape(tip)}</title>'
             f'<line x1="{w/2}" y1="1" x2="{w/2}" y2="{h-1}" stroke="#bbb" stroke-dasharray="2,2"/>'
             f'<line x1="{xl:.1f}" y1="{h/2}" x2="{xh:.1f}" y2="{h/2}" stroke="{col}" stroke-width="1.2"/>'
@@ -141,24 +203,48 @@ def candle_svg(c: dict, span: float, w=96, h=16) -> str:
 
 
 def build_html(rows, missing, refresh=None, next_run=None, demo=False) -> str:
-    # 기간별 공통 스케일: 해당 컬럼 전체 종목의 최대 |고/저 %| 기준
-    spans = {}
+    etf_rows = [r for r in rows if not r.get("is_fx")]
+    fx_rows = [r for r in rows if r.get("is_fx")]
+
+    # 기간별 공통 스케일: ETF와 환율 각각의 최대 |고/저 %| 기준
+    spans, fx_spans = {}, {}
     for p, _ in PERIODS:
-        m = [max(abs(r["candles"][p]["H"] / r["candles"][p]["base"] - 1),
-                 abs(r["candles"][p]["L"] / r["candles"][p]["base"] - 1)) * 100
-             for r in rows if p in r["candles"]]
-        spans[p] = max(max(m, default=1) * 1.05, 0.5)
+        m_etf = [max(abs(r["candles"][p]["H"] / r["candles"][p]["base"] - 1),
+                     abs(r["candles"][p]["L"] / r["candles"][p]["base"] - 1)) * 100
+                 for r in etf_rows if p in r["candles"]]
+        spans[p] = max(max(m_etf, default=1) * 1.05, 0.5)
+
+        m_fx = [max(abs(r["candles"][p]["H"] / r["candles"][p]["base"] - 1),
+                    abs(r["candles"][p]["L"] / r["candles"][p]["base"] - 1)) * 100
+                for r in fx_rows if p in r["candles"]]
+        fx_spans[p] = max(max(m_fx, default=0.5) * 1.05, 0.3)
 
     def color(v): return UP if v > 0 else DOWN if v < 0 else FLAT
 
     body = []
-    for r in rows:
+    for r in etf_rows:
         tds = "".join(f'<td class="cd">{candle_svg(r["candles"].get(p, {}), spans[p])}</td>' for p, _ in PERIODS)
         body.append(
             f'<tr><td class="nm">{html.escape(r["name"])}<span class="code">{r["code"]}</span></td>'
             f'<td class="num" style="color:{color(r["chg"])}">{r["price"]:,.0f}</td>'
             f'<td class="num" style="color:{color(r["chg"])}">{r["chg"]:+.2f}</td>'
             f'{tds}<td class="num">{r["mcap"]:,.0f}</td></tr>')
+
+    if fx_rows:
+        fx_scale_info = " / ".join(f"{t[1:-1]} ±{fx_spans[p]:.1f}%" for p, t in PERIODS)
+        body.append(
+            f'<tr><td class="cap" colspan="{4 + len(PERIODS)}">주요 환율 (원화 기준 · 스케일: {fx_scale_info})</td></tr>'
+        )
+        for r in fx_rows:
+            tds = "".join(
+                f'<td class="cd">{candle_svg(r["candles"].get(p, {}), fx_spans[p], fmt=",.2f")}</td>'
+                for p, _ in PERIODS
+            )
+            body.append(
+                f'<tr><td class="nm"><b>{html.escape(r["name"])}</b><span class="code">{r["code"]}</span></td>'
+                f'<td class="num" style="color:{color(r["chg"])}">{r["price"]:,.2f}</td>'
+                f'<td class="num" style="color:{color(r["chg"])}">{r["chg"]:+.2f}</td>'
+                f'{tds}<td class="num">-</td></tr>')
 
     head = "".join(f"<th>{t}<div class='sub'>±{spans[p]:.1f}%</div></th>" for p, t in PERIODS)
     now = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
