@@ -22,7 +22,7 @@ ETF_NAMES = [
     "KODEX 200", "KODEX 코스닥150", "TIGER 반도체TOP10", "SOL AI반도체소부장",
     "KoAct 바이오헬스케어액티브", "KODEX 2차전지산업", "KODEX 자동차",
     "KODEX AI전력핵심설비", "TIGER 코리아원자력", "TIGER 코리아휴머노이드로봇산업",
-    "TIGER 화장품", "SOL 조선TOP3플러스", "PLUS K방산", "PLUS 우주항공",
+    "SOL 화장품TOP3플러스", "SOL 조선TOP3플러스", "PLUS K방산", "PLUS 우주항공",
     "PLUS 태양광&ESS", "KODEX 신재생에너지액티브", "TIGER 여행레저",
     "ACE KPOP포커스", "TIGER 소프트웨어", "KoAct 광통신&위성네트워크액티브",
     "KODEX 건설", "TIGER 은행고배당플러스TOP10", "KODEX 증권",
